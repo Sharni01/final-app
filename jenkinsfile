@@ -1,0 +1,55 @@
+// Task 6: Configure Jenkins Pipeline
+
+// Configuration variables
+def DOCKERHUB_USERNAME = 'sharninadar' // <<< CHANGE THIS!
+def IMAGE_NAME = "${DOCKERHUB_USERNAME}/project-app"
+def EC2_HOST = '44.200.42.39' // Your EC2 IP
+def APP_CONTAINER_NAME = 'final_app_deployment'
+
+pipeline {
+    agent any
+    environment {
+        // Jenkins Credentials IDs (MUST be created in Jenkins later)
+        DOCKER_CREDENTIALS_ID = 'dockerhub-creds'
+        SSH_CREDENTIALS_ID = 'ec2-ssh-key' 
+    }
+
+    stages {
+        stage('1. Build Docker Image') {
+            steps {
+                script {
+                    sh "docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} ."
+                }
+            }
+        }
+        
+        stage('2. Push to Docker Hub') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: env.DOCKER_CREDENTIALS_ID, passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
+                    sh "docker login -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}"
+                    // Tag and push both the build number and 'latest'
+                    sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${IMAGE_NAME}:latest"
+                    sh "docker push ${IMAGE_NAME}:${BUILD_NUMBER}"
+                    sh "docker push ${IMAGE_NAME}:latest"
+                }
+            }
+        }
+        
+        // Task 5: Deploy to EC2 Instance (Deployment Stage)
+        stage('3. Deploy to EC2') {
+            steps {
+                sshagent(credentials: [env.SSH_CREDENTIALS_ID]) {
+                    sh "ssh -o StrictHostKeyChecking=no ubuntu@${EC2_HOST} ' \
+                        echo \"Starting Deployment...\" && \
+                        sudo docker pull ${IMAGE_NAME}:latest && \
+                        sudo docker stop ${APP_CONTAINER_NAME} || true && \
+                        sudo docker rm ${APP_CONTAINER_NAME} || true && \
+                        sudo docker run -d --name ${APP_CONTAINER_NAME} -p 80:80 \
+                        ${IMAGE_NAME}:latest \
+                        echo \"Deployment Complete!\" \
+                    '"
+                }
+            }
+        }
+    }
+}
