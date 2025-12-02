@@ -11,7 +11,7 @@ pipeline {
     environment {
         // Jenkins Credentials IDs (MUST be created in Jenkins later)
         DOCKER_CREDENTIALS_ID = 'dockerhub-creds'
-        SSH_CREDENTIALS_ID = 'ec2-ssh-key' 
+        SSH_CREDENTIALS_ID = 'ubuntu' 
     }
 
     stages {
